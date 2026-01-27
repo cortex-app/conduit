@@ -10,9 +10,9 @@ Conduit is a Model Context Protocol (MCP) server that provides seamless integrat
 - **Modular Clients** (`src/client/*.py`): Specialized clients for different Phabricator APIs
 
 ### Supported APIs
-- **Maniphest**: Task management (search, create, edit tasks)
+- **Maniphest**: Task management (search, create, edit tasks, get transaction history)
 - **Differential**: Code review (search, create, manage revisions)
-- **Diffusion**: Repository management (search, browse, commits)
+- **Diffusion**: Repository management (search, browse, commits, file content with base64 decoding)
 - **File**: File management (search, upload, download)
 - **User**: User management (information, queries)
 - **Project**: Project management (search, members, workboards)
@@ -75,6 +75,8 @@ Before executing any Python code or command, you need to activate the Python vir
 PHABRICATOR_TOKEN=<api-token> PHABRICATOR_URL=http://127.0.0.1:8080/api/ pytest # or any Python command
 ```
 
+**Note on Testing Strategy**: The unit tests in this project are designed to test against live Phabricator/Phorge instances without mocking. This ensures all code works correctly with real API responses. Tests accept a `PHABRICATOR_URL` and `PHABRICATOR_TOKEN` environment variable to connect to the test instance. All tests in `conduit/client/tests/` and `conduit/tests/` are integration tests that verify real API behavior.
+
 ### Code Quality Tools
 - **Security**: bandit scanning (`.bandit_scan.cfg`)
 - **Pre-commit**: Automated quality checks (`.pre-commit-config.yaml`)
@@ -117,6 +119,28 @@ all_diffs = revision["all_diffs"]  # All historical diffs
 # Get specific diff content using PHID
 diff_content = pha_diff_get_content(current_diff_phid)
 raw_diff = diff_content["diff_content"]
+
+# Get repository file content with automatic base64 decoding
+file_result = pha_repository_file_content(
+    repository="repo_name",
+    file_path="path/to/file.txt"
+)
+file_content = file_result["file_content"]  # Already decoded text
+```
+
+### Maniphest Tools Usage Patterns
+```python
+# Get task transaction history including comments
+transactions_result = pha_task_get_transactions(task_id="1234")
+transactions_data = transactions_result["transactions"]
+transactions = transactions_data["data"]
+
+# Each transaction contains:
+# - type: Transaction type (comment, status, priority, etc.)
+# - authorPHID: Author PHID
+# - dateCreated: Creation timestamp
+# - comments: Comment content (for comment-type transactions)
+# - oldValue/newValue: Before/after values (for field changes)
 ```
 
 ### Error Handling
@@ -181,6 +205,7 @@ client.maniphest.edit_task(task_id, transactions)
 - **Utilities**: Shared functionality in `src/utils/` (errors, validation, parameters)
 - **Tools**: MCP tool definitions in `src/main_tools.py`
 - **Tests**: Mirror source structure in `src/client/tests/`
+- **Specialized Tool Modules**: Advanced tools in `src/tools/` (diffusion_tools.py, handlers.py, optimization.py)
 
 ## Common Pitfalls
 
@@ -191,6 +216,9 @@ client.maniphest.edit_task(task_id, transactions)
 5. **Type Safety**: Runtime validation is optional - check `enable_type_safety` parameter
 6. **Diff Content Access**: Use `pha_diff_get_content()` with PHID format, not numeric IDs
 7. **Revision History**: `pha_diff_get()` returns all diffs via `all_diffs` field for complete history
+8. **File Content Encoding**: `pha_repository_file_content()` returns decoded content, not base64
+9. **Task Transaction History**: Transaction IDs should be in PHID format for `transaction.search` API
+10. **Task Comments**: Use `pha_task_get_transactions()` to retrieve both comments and field changes
 
 ## FastMCP Debugging Guide
 

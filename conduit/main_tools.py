@@ -415,6 +415,44 @@ def register_tools(  # noqa: C901
 
     @mcp.tool()
     @handle_api_errors
+    @optimize_token_usage
+    def pha_task_get_transactions(task_id: str) -> dict:
+        """
+        Get transaction history for a Phabricator task, including comments.
+
+        Args:
+            task_id: The numeric ID or PHID of the task to retrieve transactions for (e.g., "1234" or "PHID-TASK-xxx")
+
+        Returns:
+            Transaction history with all changes and comments for the task
+        """
+        client = get_client_func()
+
+        # If task_id is a numeric ID, get PHID first
+        if task_id.isdigit():
+            task_id_int = int(task_id)
+            # Search for task to get PHID
+            task_result = client.maniphest.search_tasks(
+                constraints={"ids": [task_id_int]}, limit=1
+            )
+
+            if not task_result.get("data"):
+                return {"success": False, "error": f"Task with ID {task_id} not found"}
+
+            task_phid = task_result["data"][0]["phid"]
+        else:
+            # Assume it's already a PHID
+            task_phid = task_id
+
+        # Use modern transaction.search API
+        result = client.maniphest.search_task_transactions(
+            task_phid=task_phid, limit=100
+        )
+
+        return {"success": True, "transactions": result}
+
+    @mcp.tool()
+    @handle_api_errors
     def pha_task_get_personal(
         task_type: Literal["assigned", "authored"] = "assigned",
         include_projects: bool = True,

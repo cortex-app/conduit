@@ -169,6 +169,27 @@ class ManiphestClient(BasePhabricatorClient):
         """
         return self._make_request("maniphest.gettasktransactions", {"ids": [task_id]})
 
+    def search_task_transactions(
+        self,
+        task_phid: str,
+        limit: int = 100,
+    ) -> Dict[str, Any]:
+        """
+        Search for transactions and comments for a specific task using modern API.
+
+        Args:
+            task_phid: PHID of the task to get transactions for
+            limit: Maximum number of transactions to return
+
+        Returns:
+            Search results with transaction data
+        """
+        params = {
+            "objectIdentifier": task_phid,
+            "limit": limit,
+        }
+        return self._make_request("transaction.search", params)
+
     def query_tasks(self, constraints: Dict[str, Any] = None) -> Dict[str, Any]:
         """
         Execute complex searches for Maniphest tasks (legacy method).

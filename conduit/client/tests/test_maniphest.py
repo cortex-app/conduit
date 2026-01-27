@@ -541,4 +541,96 @@ class TestManiphestClient(TestCase):
         )
 
         # 这个测试确保了修复的有效性，防止回归
+
+    def test_search_task_transactions(self):
+        """测试获取任务事务历史的功能"""
+        # 先为测试任务添加一些评论和变更
+        test_comment1 = "This is a test comment for transaction history"
+        test_comment2 = "Another test comment"
+
+        # 添加第一条评论
+        self.cli.edit_task(
+            object_identifier=self.task["id"],
+            transactions=[
+                ManiphestTaskTransactionComment(
+                    type="comment",
+                    value=test_comment1,
+                )
+            ],
+        )
+
+        # 修改任务状态
+        self.cli.edit_task(
+            object_identifier=self.task["id"],
+            transactions=[
+                ManiphestTaskTransactionStatus(
+                    type="status",
+                    value="resolved",
+                )
+            ],
+        )
+
+        # 添加第二条评论
+        self.cli.edit_task(
+            object_identifier=self.task["id"],
+            transactions=[
+                ManiphestTaskTransactionComment(
+                    type="comment",
+                    value=test_comment2,
+                )
+            ],
+        )
+
+        with self.subTest("Get transactions for task"):
+            """测试获取任务的事务历史"""
+            transactions = self.cli.search_task_transactions(
+                task_phid=self.task["phid"]
+            )
+
+            # 验证返回的基本结构
+            self.assertIsInstance(transactions, dict)
+            self.assertIn("data", transactions)
+
+            # 验证事务列表
+            transaction_list = transactions["data"]
+            self.assertIsInstance(transaction_list, list)
+
+            # 应该至少包含我们添加的事务（创建 + 评论 + 状态变更）
+            self.assertGreater(len(transaction_list), 2)
+
+        with self.subTest("Verify transaction types"):
+            """验证事务类型"""
+            transactions = self.cli.search_task_transactions(
+                task_phid=self.task["phid"]
+            )
+            transaction_list = transactions["data"]
+
+            # 验证每个事务都有必要字段
+            for tx in transaction_list:
+                self.assertIn("type", tx)
+                self.assertIn("authorPHID", tx)
+                self.assertIn("dateCreated", tx)
+
+        with self.subTest("Find comment transactions"):
+            """查找评论类型的事务"""
+            transactions = self.cli.search_task_transactions(
+                task_phid=self.task["phid"]
+            )
+            transaction_list = transactions["data"]
+
+            # 查找所有评论类型的事务
+            comment_txs = [tx for tx in transaction_list if tx.get("type") == "comment"]
+
+            # 应该至少有我们添加的两条评论
+            self.assertGreater(len(comment_txs), 0)
+
+        with self.subTest("Get transactions with limit"):
+            """测试限制返回的事务数量"""
+            transactions = self.cli.search_task_transactions(
+                task_phid=self.task["phid"], limit=5
+            )
+            transaction_list = transactions["data"]
+
+            # 验证返回数量不超过限制
+            self.assertLessEqual(len(transaction_list), 5)
         # 如果这里失败，说明 "Expected a list, but value is not a list" 错误可能会重新出现
