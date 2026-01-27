@@ -841,13 +841,38 @@ def register_tools(  # noqa: C901
         Returns:
             File content and metadata
         """
+        import base64
+
         client = get_client_func()
 
-        result = client.diffusion.file_content_query(
+        # Step 1: Get file PHID from repository
+        file_info = client.diffusion.file_content_query(
             repository=repository, path=file_path, commit=commit if commit else None
         )
 
-        return {"success": True, "file_content": result}
+        # Step 2: Download actual file content using the file PHID
+        file_phid = file_info.get("filePHID")
+        if not file_phid:
+            return {
+                "success": False,
+                "error": "File PHID not found in repository query result",
+                "file_info": file_info,
+            }
+
+        # Download the actual file content
+        download_result = client.file.download_file(file_phid=file_phid)
+
+        # Step 3: Decode base64 content if returned
+        file_content = download_result
+        if isinstance(download_result, str) and download_result:
+            try:
+                file_content = base64.b64decode(download_result).decode("utf-8")
+            except Exception:
+                # If decoding fails, keep original content
+                file_content = download_result
+
+        # Combine metadata with actual decoded content
+        return {"success": True, "file_content": file_content, "metadata": file_info}
 
     @mcp.tool()
     @handle_api_errors

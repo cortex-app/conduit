@@ -148,16 +148,59 @@ class TestDiffusionClient(TestCase):
 
         repo_phid = self.test_repo["object"]["phid"]
 
-        with self.subTest("Get file content"):
+        with self.subTest("Get file content PHID"):
             try:
                 result = self.cli.file_content_query(
                     repository=repo_phid, path="README.md"
                 )
-                # The exact structure depends on repository setup
+                # Should return file PHID and metadata
                 self.assertIsInstance(result, dict)
+                self.assertIn("filePHID", result)
+                self.assertIn("tooSlow", result)
+                self.assertIn("tooHuge", result)
             except PhabricatorAPIError:
                 # File might not exist or repository not ready
-                pass
+                self.skipTest("README.md not found in repository")
+
+    def test_file_content_with_base64_decoding(self):
+        """Test that file content retrieval includes base64 decoding."""
+        if not self.test_repo:
+            self.skipTest("No test repository available")
+
+        repo_phid = self.test_repo["object"]["phid"]
+
+        with self.subTest("Get file PHID"):
+            try:
+                # Step 1: Get file PHID
+                file_info = self.cli.file_content_query(
+                    repository=repo_phid, path="README.md"
+                )
+
+                self.assertIsInstance(file_info, dict)
+                self.assertIn("filePHID", file_info)
+
+                file_phid = file_info["filePHID"]
+
+                # Step 2: Download file content (returns base64)
+                download_result = self.cli.file.download_file(file_phid=file_phid)
+
+                # The download result should be a string (base64 encoded)
+                self.assertIsInstance(download_result, str)
+
+                # Step 3: Validate it can be decoded
+                import base64
+
+                try:
+                    decoded_content = base64.b64decode(download_result).decode("utf-8")
+                    self.assertIsInstance(decoded_content, str)
+                    # Should have some content
+                    self.assertGreater(len(decoded_content), 0)
+                except Exception as e:
+                    self.fail(f"Failed to decode base64 content: {e}")
+
+            except PhabricatorAPIError as e:
+                # File might not exist or repository not ready
+                self.skipTest(f"README.md not found or repository error: {e}")
 
     def test_history_query(self):
         """Test repository history querying"""
