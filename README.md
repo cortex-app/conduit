@@ -45,7 +45,15 @@ pip install -e .[dev]
 This will install the package in editable mode with all development dependencies.
 
 ### Docker
-We are still working on Docker support. We estimate it will be available soon.
+The repository includes a [`Dockerfile`](Dockerfile) that packages the MCP server for **HTTP/SSE** mode.
+
+Copy [`.env.example`](.env.example) to `.env`, edit it to update `PHABRICATOR_URL`, then:
+
+```bash
+docker compose up --build
+```
+
+The MCP server will be listening at port 8000 by default.
 
 ### As HTTP/SSE Server
 Conduit can run as an HTTP/SSE server for multi-user scenarios. This mode allows multiple clients to connect simultaneously, each using their own authentication tokens.
