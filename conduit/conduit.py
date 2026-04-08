@@ -16,6 +16,7 @@ class PhabricatorConfig(object):
         self.disable_cert_verify = os.getenv(
             "PHABRICATOR_DISABLE_CERT_VERIFY", ""
         ).lower() in ("1", "true", "yes")
+        self.user_agent = os.getenv("PHABRICATOR_USER_AGENT") or None
 
         if require_token and not self.token:
             raise ValueError("PHABRICATOR_TOKEN is required")
@@ -71,6 +72,7 @@ class ConduitApp:
                 http_token,
                 proxy=self.config.proxy,
                 disable_cert_verify=self.config.disable_cert_verify,
+                user_agent=self.config.user_agent,
             )
 
         # For stdio mode, use cached client (backward compatibility)
@@ -85,6 +87,7 @@ class ConduitApp:
             self.config.token,
             proxy=self.config.proxy,
             disable_cert_verify=self.config.disable_cert_verify,
+            user_agent=self.config.user_agent,
         )
         return self._client
 

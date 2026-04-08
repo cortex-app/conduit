@@ -7,6 +7,7 @@ from typing import Any, Dict, Optional
 import httpx
 from httpx import Limits, Timeout
 
+from conduit.client.base import DEFAULT_USER_AGENT, DEFAULT_ENHANCED_USER_AGENT
 from conduit.client.differential import DifferentialClient
 from conduit.client.diffusion import DiffusionClient
 from conduit.client.file import FileClient
@@ -253,13 +254,14 @@ class EnhancedPhabricatorClient(object):
         retry_backoff: float = 2.0,
         enable_cache: bool = True,
         cache_ttl: int = 300,
+        user_agent: Optional[str] = None,
         **kwargs,
     ):
         # Initialize enhanced HTTP client
         self.http_client = httpx.Client(
             headers={
                 "Content-Type": "application/x-www-form-urlencoded",
-                "User-Agent": "ModelContextProtocol/1.0 (Enhanced; +https://github.com/modelcontextprotocol/servers)",
+                "User-Agent": user_agent or DEFAULT_ENHANCED_USER_AGENT,
             },
             timeout=Timeout(
                 connect=connect_timeout,
@@ -367,6 +369,7 @@ class PhabricatorClient(object):
         timeout: float = 30.0,
         max_retries: int = 3,
         enable_cache: bool = True,
+        user_agent: Optional[str] = None,
         **kwargs,
     ):
         # Use enhanced client if advanced features are requested
@@ -383,6 +386,7 @@ class PhabricatorClient(object):
                 enable_cache=enable_cache,
                 proxy=proxy,
                 disable_cert_verify=disable_cert_verify,
+                user_agent=user_agent,
                 **kwargs,
             )
             self.http_client = self._enhanced_client.http_client
@@ -392,7 +396,7 @@ class PhabricatorClient(object):
             self.http_client = httpx.Client(
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "ModelContextProtocol/1.0 (Autonomous; +https://github.com/modelcontextprotocol/servers)",
+                    "User-Agent": user_agent or DEFAULT_USER_AGENT,
                 },
                 timeout=30,
                 follow_redirects=True,

@@ -7,10 +7,23 @@ import httpx
 
 from conduit.utils import PhabricatorAPIError
 
+DEFAULT_USER_AGENT = (
+    "ModelContextProtocol/1.0 (Autonomous; "
+    "+https://github.com/modelcontextprotocol/servers)"
+)
+DEFAULT_ENHANCED_USER_AGENT = (
+    "ModelContextProtocol/1.0 (Enhanced; "
+    "+https://github.com/modelcontextprotocol/servers)"
+)
+
 
 class BasePhabricatorClient(ABC):
     def __init__(
-        self, api_url: str, api_token: str, http_client: Optional[httpx.Client] = None
+        self,
+        api_url: str,
+        api_token: str,
+        http_client: Optional[httpx.Client] = None,
+        user_agent: Optional[str] = None,
     ):
         """
         Initialize the base Phabricator client.
@@ -19,6 +32,8 @@ class BasePhabricatorClient(ABC):
             api_url: Base URL for the Phabricator API
             api_token: API token for authentication
             http_client: Optional httpx client to reuse
+            user_agent: Optional User-Agent header override. Defaults to
+                DEFAULT_USER_AGENT when not provided.
         """
         self.api_url = api_url.rstrip("/") + "/"
         self.api_token = api_token
@@ -28,7 +43,7 @@ class BasePhabricatorClient(ABC):
             self.client = httpx.Client(
                 headers={
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "User-Agent": "ModelContextProtocol/1.0 (Autonomous; +https://github.com/modelcontextprotocol/servers)",
+                    "User-Agent": user_agent or DEFAULT_USER_AGENT,
                 },
                 timeout=30.0,
                 follow_redirects=True,

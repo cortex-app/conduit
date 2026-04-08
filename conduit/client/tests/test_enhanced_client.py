@@ -2,6 +2,7 @@
 
 import sys
 
+from conduit.client.base import DEFAULT_USER_AGENT
 from conduit.client.unified import (
     ClientConfig,
     EnhancedPhabricatorClient,
@@ -135,6 +136,73 @@ def test_enhanced_direct():
     print("✓ Direct EnhancedPhabricatorClient test passed")
 
 
+def test_user_agent_default():
+    """The default User-Agent is applied when no override is passed."""
+    print("\nTesting default User-Agent...")
+
+    # Basic (non-enhanced) path
+    basic = PhabricatorClient(
+        api_url="https://test.example.com/api/", api_token="test_token"
+    )
+    assert basic.http_client.headers["user-agent"] == DEFAULT_USER_AGENT
+    basic.close()
+
+    # Enhanced path (triggered by non-default timeout)
+    enhanced = PhabricatorClient(
+        api_url="https://test.example.com/api/",
+        api_token="test_token",
+        timeout=60.0,
+    )
+    assert enhanced.http_client.headers["user-agent"] == DEFAULT_USER_AGENT
+    enhanced.close()
+
+    # Direct EnhancedPhabricatorClient
+    direct = EnhancedPhabricatorClient(
+        api_url="https://test.example.com/api/", api_token="test_token"
+    )
+    assert direct.http_client.headers["user-agent"] == DEFAULT_USER_AGENT
+    direct.close()
+
+    print("✓ Default User-Agent test passed")
+
+
+def test_user_agent_override():
+    """A user_agent kwarg overrides the default in all client flavors."""
+    print("\nTesting User-Agent override...")
+
+    custom_ua = "MyOrg-Phabricator-MCP/1.0 (contact@example.org)"
+
+    # Basic (non-enhanced) path
+    basic = PhabricatorClient(
+        api_url="https://test.example.com/api/",
+        api_token="test_token",
+        user_agent=custom_ua,
+    )
+    assert basic.http_client.headers["user-agent"] == custom_ua
+    basic.close()
+
+    # Enhanced path via PhabricatorClient wrapper
+    enhanced = PhabricatorClient(
+        api_url="https://test.example.com/api/",
+        api_token="test_token",
+        timeout=60.0,
+        user_agent=custom_ua,
+    )
+    assert enhanced.http_client.headers["user-agent"] == custom_ua
+    enhanced.close()
+
+    # Direct EnhancedPhabricatorClient
+    direct = EnhancedPhabricatorClient(
+        api_url="https://test.example.com/api/",
+        api_token="test_token",
+        user_agent=custom_ua,
+    )
+    assert direct.http_client.headers["user-agent"] == custom_ua
+    direct.close()
+
+    print("✓ User-Agent override test passed")
+
+
 if __name__ == "__main__":
     print("Running enhanced client tests...")
 
@@ -143,6 +211,8 @@ if __name__ == "__main__":
         test_basic_client()
         test_enhanced_client()
         test_enhanced_direct()
+        test_user_agent_default()
+        test_user_agent_override()
 
         print("\nAll tests passed successfully!")
 

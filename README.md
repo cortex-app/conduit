@@ -69,6 +69,7 @@ export PHABRICATOR_URL="https://your-phabricator-instance.com/api/"
 
 export PHABRICATOR_PROXY="socks5://127.0.0.1:1080"  # Optional, if your network is behind a firewall
 export PHABRICATOR_DISABLE_CERT_VERIFY=1  # Optional, if your network is under HTTPS filter (WARNING: Disabling certificate verification can expose you to security risks. Only set this if you trust your network environment.)
+export PHABRICATOR_USER_AGENT="MyOrg-Phabricator-MCP/1.0 (contact@example.org)"  # Optional, override the default User-Agent header. Some Phabricator/Phorge operators require identifying contact info for rate-limiting purposes.
 ```
 Do note that in HTTPS/SSE mode, `PHABRICATOR_TOKEN` is NOT needed.
 

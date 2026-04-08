@@ -30,6 +30,7 @@ This project uses `uv` virtual environment. Before executing any Python code, ac
 # export PHABRICATOR_URL="https://your-phabricator-instance.com/api/"
 # export PHABRICATOR_PROXY="socks5://127.0.0.1:1080"  # Optional
 # export PHABRICATOR_DISABLE_CERT_VERIFY=1  # Optional (security risk)
+# export PHABRICATOR_USER_AGENT="MyOrg-Phabricator-MCP/1.0 (contact@example.org)"  # Optional User-Agent override
 
 # Actual execution with environment variables:
 PHABRICATOR_TOKEN="your-32-character-token" \
