@@ -566,6 +566,7 @@ def register_tools(  # noqa: C901
         include_subscribers: bool = False,
         include_projects: bool = False,
         include_columns: bool = False,
+        include_description: bool = True,
         limit: int = 100,
         preset: Literal[
             "all", "assigned", "authored", "open", "high_priority", "recent"
@@ -593,6 +594,9 @@ def register_tools(  # noqa: C901
             include_subscribers: Include subscriber information in results
             include_projects: Include project information in results
             include_columns: Include workboard column information in results
+            include_description: Include task description in results (default: True). Set to False
+                to omit fields.description from each task, reducing payload size by ~70-90% for
+                typical tasks. Use when only metadata (id, title, status, priority) is needed.
             limit: Maximum number of results to return (default: 100, max: 1000)
             preset: Preset search configurations for common use cases
 
@@ -688,6 +692,10 @@ def register_tools(  # noqa: C901
             order=order or None,
             limit=limit,
         )
+
+        if not include_description:
+            for task in result.get("data", []):
+                task.get("fields", {}).pop("description", None)
 
         # Add pagination metadata
         result = _add_pagination_metadata(result, result.get("cursor"))
