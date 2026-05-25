@@ -371,5 +371,116 @@ class TestMCPToolsMocked(unittest.TestCase):
         self.assertTrue(mock_handle_errors.called)
 
 
+class TestTaskSearchAdvancedIncludeDescription(unittest.TestCase):
+    """Unit tests for the include_description parameter of pha_task_search_advanced."""
+
+    def setUp(self):
+        self.mock_client = Mock()
+        captured_tools = {}
+
+        def fake_tool(*args, **kwargs):
+            def decorator(func):
+                captured_tools[func.__name__] = func
+                return func
+
+            return decorator
+
+        mock_mcp = Mock()
+        mock_mcp.tool = fake_tool
+        register_tools(mock_mcp, lambda: self.mock_client)
+        self.captured_tools = captured_tools
+
+    def _get_func(self):
+        func = self.captured_tools.get("pha_task_search_advanced")
+        if func is None:
+            self.fail("pha_task_search_advanced not registered")
+        return func
+
+    def _make_search_result(self, tasks):
+        return {"data": tasks, "cursor": {"limit": 100, "after": None, "before": None}}
+
+    def _make_task(self, task_id, name, description_raw="Some description text"):
+        return {
+            "id": task_id,
+            "type": "TASK",
+            "phid": f"PHID-TASK-{task_id:010d}",
+            "fields": {
+                "name": name,
+                "status": {"value": "open", "name": "Open"},
+                "priority": {"value": 50, "name": "Normal"},
+                "description": {"raw": description_raw},
+            },
+        }
+
+    def test_description_included_by_default(self):
+        """Description is present when include_description is omitted."""
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            [self._make_task(1, "Test Task")]
+        )
+        result = self._get_func()()
+        self.assertIn("description", result["results"]["data"][0]["fields"])
+
+    def test_description_included_when_true(self):
+        """Description is present when include_description=True."""
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            [self._make_task(1, "Test Task")]
+        )
+        result = self._get_func()(include_description=True)
+        self.assertIn("description", result["results"]["data"][0]["fields"])
+
+    def test_description_stripped_when_false(self):
+        """Description is absent when include_description=False."""
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            [self._make_task(1, "Test Task", "Long description to be stripped")]
+        )
+        result = self._get_func()(include_description=False)
+        self.assertNotIn("description", result["results"]["data"][0]["fields"])
+
+    def test_other_fields_preserved_when_description_stripped(self):
+        """Metadata fields survive when include_description=False."""
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            [self._make_task(42, "Important Task")]
+        )
+        result = self._get_func()(include_description=False)
+        fields = result["results"]["data"][0]["fields"]
+        self.assertEqual(fields["name"], "Important Task")
+        self.assertEqual(fields["status"]["value"], "open")
+        self.assertEqual(fields["priority"]["value"], 50)
+
+    def test_all_tasks_stripped_in_multi_task_result(self):
+        """Every task has its description stripped, not just the first."""
+        tasks = [self._make_task(i, f"Task {i}", f"Description {i}") for i in range(5)]
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            tasks
+        )
+        result = self._get_func()(include_description=False)
+        for task in result["results"]["data"]:
+            self.assertNotIn("description", task["fields"])
+
+    def test_no_error_when_task_has_no_description_field(self):
+        """Tasks missing a description field are handled without error."""
+        task = {
+            "id": 1,
+            "type": "TASK",
+            "phid": "PHID-TASK-0000000001",
+            "fields": {"name": "No-description task", "status": {"value": "open"}},
+        }
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            [task]
+        )
+        result = self._get_func()(include_description=False)
+        self.assertTrue(result["success"])
+        self.assertNotIn("description", result["results"]["data"][0]["fields"])
+
+    def test_empty_result_list_handled_gracefully(self):
+        """Empty data list with include_description=False does not raise."""
+        self.mock_client.maniphest.search_tasks.return_value = self._make_search_result(
+            []
+        )
+        result = self._get_func()(include_description=False)
+        self.assertTrue(result["success"])
+        self.assertEqual(result["results"]["data"], [])
+
+
 if __name__ == "__main__":
     unittest.main()
