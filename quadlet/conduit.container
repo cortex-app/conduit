@@ -1,0 +1,16 @@
+# Runs the Conduit MCP server in HTTP/SSE mode.
+# Set PHABRICATOR_URL in a drop-in file conduit.container.d/*.conf in a
+# Quadlet search path; see the README.
+[Unit]
+Description=Conduit MCP server
+
+[Container]
+Image=conduit.build
+ContainerName=conduit
+PublishPort=127.0.0.1:8000:8000
+
+[Service]
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

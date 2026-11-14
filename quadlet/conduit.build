@@ -1,0 +1,6 @@
+# Builds the Conduit image from the Dockerfile in the root of the checkout.
+[Build]
+ImageTag=localhost/conduit:latest
+File=Dockerfile
+SetWorkingDirectory=..
+Pull=missing
