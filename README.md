@@ -45,7 +45,47 @@ pip install -e .[dev]
 This will install the package in editable mode with all development dependencies.
 
 ### Docker
-We are still working on Docker support. We estimate it will be available soon.
+The repository includes a [`Dockerfile`](Dockerfile) that packages the MCP server for **HTTP/SSE** mode.
+
+Copy [`.env.example`](.env.example) to `.env`, edit it to update `PHABRICATOR_URL`, then:
+
+```bash
+docker compose up --build
+```
+
+The MCP server will be listening at port 8000 by default.
+
+### Podman Quadlet
+The [`quadlet/`](quadlet) directory holds [Quadlet](https://docs.podman.io/en/latest/markdown/podman-systemd.unit.5.html) units that build the image from the `Dockerfile` and run the server as a systemd service with Podman:
+
+- `conduit.build` builds the image `localhost/conduit:latest`, with the root of the checkout as the build context.
+- `conduit.container` runs the container `conduit` and publishes port 8000 on `127.0.0.1`.
+
+Link the directory into a Quadlet search path, for example for a rootless user:
+
+```bash
+mkdir -p ~/.config/containers/systemd
+ln -s "$PWD/quadlet" ~/.config/containers/systemd/conduit
+```
+
+Set `PHABRICATOR_URL`, and optionally another host port, in a drop-in file `~/.config/containers/systemd/conduit.container.d/settings.conf`:
+
+```ini
+[Container]
+Environment=PHABRICATOR_URL=https://your-phabricator-instance.com/api/
+# Replace the published port:
+PublishPort=
+PublishPort=127.0.0.1:8080:8000
+```
+
+Then build the image and start the service:
+
+```bash
+systemctl --user daemon-reload
+systemctl --user start conduit.service
+```
+
+The first start builds the image. To start the service at boot without a login session, enable lingering with `loginctl enable-linger`.
 
 ### As HTTP/SSE Server
 Conduit can run as an HTTP/SSE server for multi-user scenarios. This mode allows multiple clients to connect simultaneously, each using their own authentication tokens.
