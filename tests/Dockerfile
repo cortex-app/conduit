@@ -1,4 +1,4 @@
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
@@ -26,7 +26,7 @@ RUN apt-get install -y \
     nano
 
 RUN echo "[mysqld]" > /etc/mysql/conf.d/docker.cnf && \
-    echo "skip-host-cache" >> /etc/mysql/conf.d/docker.cnf && \
+    echo "host_cache_size = 0" >> /etc/mysql/conf.d/docker.cnf && \
     echo "skip-name-resolve" >> /etc/mysql/conf.d/docker.cnf && \
     echo "bind-address = 0.0.0.0" >> /etc/mysql/conf.d/docker.cnf && \
     echo "user = mysql" >> /etc/mysql/conf.d/docker.cnf && \
@@ -67,7 +67,7 @@ server {
     }
 
     location /index.php {
-        fastcgi_pass unix:/var/run/php/php8.3-fpm.sock;
+        fastcgi_pass unix:/var/run/php/php8.5-fpm.sock;
         fastcgi_index index.php;
 
         fastcgi_param REDIRECT_STATUS 200;
@@ -93,7 +93,7 @@ RUN ln -s /etc/nginx/sites-available/phorge /etc/nginx/sites-enabled/ && \
 
 RUN usermod -d /var/lib/mysql/ mysql
 
-RUN service mysql start && \
+RUN (mysqld_safe > /dev/null 2>&1 &) && \
     until mysqladmin ping >/dev/null 2>&1; do \
         echo "Waiting for MySQL to be ready..."; \
         sleep 1; \
@@ -101,9 +101,9 @@ RUN service mysql start && \
     mysql mysql -e "CREATE USER IF NOT EXISTS 'phorge'@'localhost' IDENTIFIED BY 'Passw0rd';" && \
     mysql mysql -e "GRANT ALL PRIVILEGES ON *.* TO 'phorge'@'localhost';" && \
     mysql mysql -e "FLUSH PRIVILEGES;" && \
-    service mysql stop
+    mysqladmin shutdown
 
-RUN service mysql start && \
+RUN (mysqld_safe > /dev/null 2>&1 &) && \
     until mysqladmin ping >/dev/null 2>&1; do \
         echo "Waiting for MySQL to be ready..."; \
         sleep 1; \
@@ -113,12 +113,12 @@ RUN service mysql start && \
     ./bin/config set mysql.user phorge && \
     ./bin/config set mysql.pass Passw0rd && \
     ./bin/storage upgrade --force && \
-    service mysql stop
+    mysqladmin shutdown
 
 COPY init_phabricator /opt/phorge/bin/init_phabricator
 RUN chmod +x /opt/phorge/bin/init_phabricator
 
-RUN service mysql start && \
+RUN (mysqld_safe > /dev/null 2>&1 &) && \
     until mysqladmin ping >/dev/null 2>&1; do \
         echo "Waiting for MySQL to be ready..."; \
         sleep 1; \
@@ -128,7 +128,7 @@ RUN service mysql start && \
     grep "API Token:" /tmp/bootstrap_output.txt | cut -d' ' -f3 > /opt/phorge/api_token.txt && \
     cat /tmp/bootstrap_output.txt && \
     echo "API Token saved to /opt/phorge/api_token.txt" && \
-    service mysql stop
+    mysqladmin shutdown
 
 COPY <<EOF /usr/local/bin/start-phorge.sh
 #!/bin/bash
@@ -139,7 +139,7 @@ chown -R mysql:mysql /var/log/mysql
 chown -R mysql:mysql /var/run/mysqld
 
 # Start MySQL
-service mysql start
+(mysqld_safe > /dev/null 2>&1 &)
 
 until mysqladmin ping >/dev/null 2>&1; do
     echo "Waiting for MySQL to be ready..."
@@ -160,7 +160,7 @@ if [ $? -ne 0 ]; then
     mysql -u root -e "FLUSH PRIVILEGES;"
 fi
 
-service php8.3-fpm start
+service php8.5-fpm start
 
 echo "========================================="
 echo "Phorge is starting up..."
