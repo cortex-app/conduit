@@ -51,10 +51,11 @@ The Conduit MCP Server supports two execution modes:
 - **Required**: `PHABRICATOR_TOKEN`, `PHABRICATOR_URL`
 - **Run**: `python run.py`
 
-#### 2. HTTP/SSE Mode
+#### 2. HTTP Mode (Streamable HTTP or SSE)
 - **Required**: `PHABRICATOR_URL` only
 - **Token**: Provided via HTTP header `X-PHABRICATOR-TOKEN`
-- **Run**: `python run.py --host 127.0.0.1 --port 8000`
+- **Run**: `python run.py --transport http --host 127.0.0.1 --port 8000` (endpoint `/mcp`), or `--transport sse` (endpoint `/sse`)
+- Without `--transport`, `--host` or `--port` selects SSE for backward compatibility
 
 ### Testing
 To run unittests, you need to install Docker on your environment to run Phorge in the background.

@@ -1,11 +1,15 @@
 import argparse
 import os
+from typing import Optional
 
 from fastmcp import FastMCP
 from fastmcp.server.dependencies import get_http_headers
 
 from conduit.client import PhabricatorClient
 from conduit.main_tools import register_tools
+
+TRANSPORTS = ("stdio", "sse", "http")
+HTTP_PATHS = {"sse": "/sse", "http": "/mcp"}
 
 
 class PhabricatorConfig(object):
@@ -44,22 +48,29 @@ class PhabricatorConfig(object):
 class ConduitApp:
     """Main application class for Conduit MCP Server."""
 
-    def __init__(self, config: PhabricatorConfig, use_sse: bool = False):
+    def __init__(self, config: PhabricatorConfig, transport: str = "stdio"):
+        if transport not in TRANSPORTS:
+            raise ValueError(f"transport must be one of {', '.join(TRANSPORTS)}")
         self.config = config
-        self.use_sse = use_sse
+        self.transport = transport
         self.mcp = FastMCP("Conduit")
         self._client = None
 
+    @property
+    def uses_http(self) -> bool:
+        """Whether the server runs over an HTTP transport (SSE or Streamable HTTP)."""
+        return self.transport != "stdio"
+
     def get_client(self):
         """Get or create a Phabricator client instance."""
-        # In SSE mode, always create a fresh client for each request
+        # Over HTTP, always create a fresh client for each request
         # to prevent user identity confusion in multi-user environments
-        if self.use_sse:
+        if self.uses_http:
             headers = get_http_headers()
             http_token = headers.get("x-phabricator-token")
 
             if not http_token:
-                raise ValueError("Must provide X-PHABRICATOR-TOKEN in SSE mode.")
+                raise ValueError("Must provide X-PHABRICATOR-TOKEN in HTTP mode.")
 
             if len(http_token) != 32:
                 raise ValueError(
@@ -92,14 +103,15 @@ class ConduitApp:
         """Register all MCP tools."""
         register_tools(self.mcp, self.get_client)
 
-    def run_sse_mode(self, host: str, port: int):
-        """Run the application in SSE mode."""
-        print(f"Starting in HTTP/SSE mode on {host}:{port}")
+    def run_http_mode(self, host: str, port: int):
+        """Run the application over SSE (/sse) or Streamable HTTP (/mcp)."""
+        path = HTTP_PATHS[self.transport]
+        print(f"Starting in {self.transport} mode on http://{host}:{port}{path}")
         self.mcp.run(
-            transport="sse",
+            transport=self.transport,
             host=host,
             port=port,
-            path="/sse",
+            path=path,
         )
 
     def run_stdio_mode(self):
@@ -133,47 +145,68 @@ def should_use_sse_transport() -> bool:
     return any(arg in sys.argv for arg in sse_args)
 
 
+def resolve_transport(transport: Optional[str]) -> str:
+    """Return the transport to use.
+
+    Without --transport, --host or --port selects SSE for backward
+    compatibility, and stdio is used otherwise.
+    """
+    if transport:
+        return transport
+    return "sse" if should_use_sse_transport() else "stdio"
+
+
 def main():
     """Main entry point for the Conduit MCP Server."""
     parser = argparse.ArgumentParser(
         description="Conduit MCP Server for Phabricator and Phorge"
     )
     parser.add_argument(
+        "--transport",
+        "-t",
+        choices=TRANSPORTS,
+        help=(
+            "Transport: stdio, sse (endpoint /sse) or http (Streamable HTTP, "
+            "endpoint /mcp). Default: sse when --host or --port is given, "
+            "stdio otherwise."
+        ),
+    )
+    parser.add_argument(
         "--host",
         "-H",
         default="127.0.0.1",
-        help="Host to bind to for SSE transport (default: 127.0.0.1)",
+        help="Host to bind to for the sse and http transports (default: 127.0.0.1)",
     )
     parser.add_argument(
         "--port",
         "-p",
         type=int,
         default=8000,
-        help="Port to bind to for SSE transport (default: 8000)",
+        help="Port to bind to for the sse and http transports (default: 8000)",
     )
 
     args = parser.parse_args()
 
-    use_sse = should_use_sse_transport()
+    transport = resolve_transport(args.transport)
 
-    if use_sse:
+    if transport == "stdio":
+        config = PhabricatorConfig(require_token=True)
+        print_server_info(config)
+    else:
         config = PhabricatorConfig(require_token=False)
         print_server_info(config)
 
         print(
-            "Note: In HTTP/SSE mode, PHABRICATOR_TOKEN should be provided via HTTP headers:"
+            "Note: In HTTP mode, PHABRICATOR_TOKEN should be provided via HTTP headers:"
         )
         print("  - X-PHABRICATOR-TOKEN: <token>")
-    else:
-        config = PhabricatorConfig(require_token=True)
-        print_server_info(config)
 
     # Create and run the application
-    app = ConduitApp(config, use_sse)
+    app = ConduitApp(config, transport)
     app.register_tools()
 
-    if use_sse:
-        app.run_sse_mode(args.host, args.port)
+    if app.uses_http:
+        app.run_http_mode(args.host, args.port)
     else:
         app.run_stdio_mode()
 

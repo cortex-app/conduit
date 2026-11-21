@@ -47,12 +47,21 @@ This will install the package in editable mode with all development dependencies
 ### Docker
 We are still working on Docker support. We estimate it will be available soon.
 
-### As HTTP/SSE Server
-Conduit can run as an HTTP/SSE server for multi-user scenarios. This mode allows multiple clients to connect simultaneously, each using their own authentication tokens.
+### As HTTP Server
+Conduit can run as an HTTP server for multi-user scenarios. This mode allows multiple clients to connect simultaneously, each using their own authentication tokens.
+
+Two HTTP transports are available:
 
 ```bash
-conduit-mcp --host 127.0.0.1 --port 8000
+# Streamable HTTP, endpoint http://127.0.0.1:8000/mcp
+conduit-mcp --transport http --host 127.0.0.1 --port 8000
+
+# SSE, endpoint http://127.0.0.1:8000/sse
+conduit-mcp --transport sse --host 127.0.0.1 --port 8000
 ```
+
+Use Streamable HTTP when the client supports it. The MCP specification deprecated the SSE transport, and an SSE client must initialize a new session after a server restart; a client that does not gets `Invalid request parameters` for every call until it reconnects. Without `--transport`, `--host` or `--port` selects SSE, for backward compatibility.
+
 When running as an HTTP server, authentication tokens are provided via HTTP headers instead of environment variables.
 
 ```
@@ -70,7 +79,7 @@ export PHABRICATOR_URL="https://your-phabricator-instance.com/api/"
 export PHABRICATOR_PROXY="socks5://127.0.0.1:1080"  # Optional, if your network is behind a firewall
 export PHABRICATOR_DISABLE_CERT_VERIFY=1  # Optional, if your network is under HTTPS filter (WARNING: Disabling certificate verification can expose you to security risks. Only set this if you trust your network environment.)
 ```
-Do note that in HTTPS/SSE mode, `PHABRICATOR_TOKEN` is NOT needed.
+Do note that in HTTP mode, `PHABRICATOR_TOKEN` is NOT needed.
 
 ### Getting Your API Token
 1. Log into your Phabricator instance

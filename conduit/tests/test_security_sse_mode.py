@@ -15,7 +15,7 @@ class TestSSEModeSecurity(TestCase):
 
         # Create test configuration
         self.config = PhabricatorConfig(require_token=False)
-        self.app = ConduitApp(self.config, use_sse=True)
+        self.app = ConduitApp(self.config, transport="sse")
 
     def tearDown(self):
         super().tearDown()
@@ -147,7 +147,7 @@ class TestSSEModeSecurity(TestCase):
         stdio_config = PhabricatorConfig(
             token="stdio_test_token" + "x" * 16, require_token=False
         )
-        stdio_app = ConduitApp(stdio_config, use_sse=False)
+        stdio_app = ConduitApp(stdio_config, transport="stdio")
 
         # First call
         client_1 = stdio_app.get_client()
@@ -233,7 +233,7 @@ class TestSSEModeSecurityIntegration(TestCase):
         from conduit.client.unified import PhabricatorClient
 
         config = PhabricatorConfig(require_token=False)
-        app = ConduitApp(config, use_sse=True)
+        app = ConduitApp(config, transport="sse")
 
         # Simulate real user token
         real_token = "phabricator_api_" + "x" * 16  # 32-character token
@@ -252,12 +252,45 @@ class TestSSEModeSecurityIntegration(TestCase):
         """Test correctness of application mode configuration."""
         # Test SSE mode configuration
         sse_config = PhabricatorConfig(require_token=False)
-        sse_app = ConduitApp(sse_config, use_sse=True)
-        self.assertTrue(sse_app.use_sse)
+        sse_app = ConduitApp(sse_config, transport="sse")
+        self.assertTrue(sse_app.uses_http)
+
+        # Test Streamable HTTP mode configuration
+        http_app = ConduitApp(sse_config, transport="http")
+        self.assertTrue(http_app.uses_http)
 
         # Test stdio mode configuration
         stdio_config = PhabricatorConfig(
             token="test_token_xx" + "x" * 19, require_token=False
         )
-        stdio_app = ConduitApp(stdio_config, use_sse=False)
-        self.assertFalse(stdio_app.use_sse)
+        stdio_app = ConduitApp(stdio_config, transport="stdio")
+        self.assertFalse(stdio_app.uses_http)
+
+        # Test that an unknown transport is rejected
+        with self.assertRaises(ValueError):
+            ConduitApp(sse_config, transport="websocket")
+
+    @patch("conduit.conduit.get_http_headers")
+    def test_http_mode_uses_header_token(self, mock_get_headers):
+        """Test that Streamable HTTP mode takes the token from the HTTP header."""
+        config = PhabricatorConfig(require_token=False)
+        app = ConduitApp(config, transport="http")
+
+        token = "http_mode_token_" + "x" * 16  # 32-character token
+        mock_get_headers.return_value = {"x-phabricator-token": token}
+        self.assertEqual(app.get_client().user.api_token, token)
+
+        mock_get_headers.return_value = {}
+        with self.assertRaises(ValueError):
+            app.get_client()
+
+    def test_resolve_transport(self):
+        """Test transport selection from the command line arguments."""
+        from conduit.conduit import resolve_transport
+
+        with patch("sys.argv", ["conduit-mcp", "--transport", "http"]):
+            self.assertEqual(resolve_transport("http"), "http")
+        with patch("sys.argv", ["conduit-mcp", "--port", "8000"]):
+            self.assertEqual(resolve_transport(None), "sse")
+        with patch("sys.argv", ["conduit-mcp"]):
+            self.assertEqual(resolve_transport(None), "stdio")
